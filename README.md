@@ -36,7 +36,7 @@ Your App  →  Playwright scripts  →  Screenshots  →  Remotion composition  
 # Scaffold videodoc into your project
 npx create-videodoc init
 
-# Install deps (Playwright + Remotion added automatically)
+# Install dependencies (added to package.json by the scaffolder)
 npm install
 
 # Edit your seed data

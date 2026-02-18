@@ -4,12 +4,13 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "eslint packages/*/src/**/*.{js,jsx}",
+    "test": "node --test packages/core/src/voiceover/extract-captions.test.js packages/core/src/playwright/helpers.test.js",
+    "lint": "ESLINT_USE_FLAT_CONFIG=1 eslint packages/*/src/**/*.js",
     "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
+    "@eslint/js": "^9.15.0",
     "eslint": "^8.57.0"
   },
   "engines": { "node": ">=18.0.0" }

@@ -1,7 +1,8 @@
+# Example workflow for projects that use videodoc.
+# Copy this file to your app repo as .github/workflows/docs.yml and add: on.push.branches.
+# This repo does not run it on push (no dev server here). Requires: npm run dev, docs:screenshots, docs:render.
 name: Generate Documentation Videos
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 jobs:
   docs:

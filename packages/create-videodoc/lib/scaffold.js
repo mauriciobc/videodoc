@@ -220,6 +220,7 @@ function patchPackageJson({ outputDir }) {
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
   pkg.scripts = pkg.scripts ?? {};
+  pkg.devDependencies = pkg.devDependencies ?? {};
 
   const newScripts = {
     'docs:screenshots': 'playwright test docs-automation/journeys/',
@@ -235,5 +236,18 @@ function patchPackageJson({ outputDir }) {
     }
   });
 
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\\n', 'utf-8');
+  const suggestedDevDeps = {
+    '@videodoc/core': 'latest',
+    '@playwright/test': 'latest',
+    'remotion': 'latest',
+    'react': 'latest',
+    'react-dom': 'latest',
+  };
+  Object.entries(suggestedDevDeps).forEach(([dep, version]) => {
+    if (!(dep in pkg.devDependencies)) {
+      pkg.devDependencies[dep] = version;
+    }
+  });
+
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
 }

@@ -19,6 +19,7 @@ export {
   setupApiState,
   waitAndCapture,
   hoverAndCapture,
+  resetToFreshState,
   defaultSlowMo,
 } from './playwright/helpers.js';
 

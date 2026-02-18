@@ -8,7 +8,8 @@
     ".": "./src/index.js",
     "./playwright": "./src/playwright/index.js",
     "./remotion": "./src/remotion/index.js",
-    "./theme": "./src/remotion/theme.js"
+    "./theme": "./src/remotion/theme.js",
+    "./voiceover": "./src/voiceover/index.js"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40.0",

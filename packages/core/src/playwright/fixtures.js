@@ -6,7 +6,7 @@ export function createFixture(seedData) {
     data: seedData,
     extend({ stateMethod = 'localStorage', baseUrl = '/' } = {}) {
       return base.extend({
-        outputDir: async ({}, use) => {
+        outputDir: async (_deps, use) => {
           await use(process.env.VIDEODOC_OUTPUT_DIR || './docs-output/screenshots');
         },
         page: async ({ page, request }, use) => {

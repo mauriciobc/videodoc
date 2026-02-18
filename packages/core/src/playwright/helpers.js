@@ -20,7 +20,7 @@ export async function waitAndCapture(page, selector, name, outputDir) {
 
 export async function hoverAndCapture(page, selector, name, outputDir) {
   await page.hover(selector);
-  await page.waitForTimeout(300);
+  await new Promise((r) => setTimeout(r, 300));
   await capture(page, name, outputDir);
 }
 
