@@ -23,8 +23,10 @@ export async function scaffold(answers) {
     path.join(targetDir, 'compositions'),
     path.join(targetDir, 'fixtures'),
     path.join(targetDir, 'assets', 'screenshots'),
+    path.join(targetDir, 'assets', 'brand'),
   ];
   dirs.forEach((d) => fs.mkdirSync(d, { recursive: true }));
+  writeFile(path.join(targetDir, 'assets', 'brand', '.gitkeep'), '');
 
   writeFile(
     path.join(targetDir, 'playwright.config.js'),
@@ -59,6 +61,11 @@ export async function scaffold(answers) {
   writeFile(
     path.join(targetDir, 'compositions', 'ExampleJourney.jsx'),
     compositionTemplate({ projectName, outputDir })
+  );
+
+  writeFile(
+    path.join(targetDir, 'manifest.json'),
+    manifestFile({ projectName, baseUrl, primaryColor, fps, resolution })
   );
 
   patchPackageJson({ outputDir });
@@ -111,6 +118,14 @@ export const theme = mergeTheme({
 `;
 }
 
+function manifestFile({ projectName, baseUrl, primaryColor, fps, resolution }) {
+  return JSON.stringify(
+    { projectName, baseUrl, primaryColor, fps, resolution },
+    null,
+    2
+  );
+}
+
 function rootFile({ projectName, fps, resolution }) {
   return `import { Composition } from 'remotion';
 import { ExampleJourney } from './compositions/ExampleJourney.jsx';
@@ -122,6 +137,7 @@ export const RemotionRoot = () => {
       <Composition
         id="ExampleJourney"
         component={ExampleJourney}
+        ${'{/* TODO: update durationInFrames to match your composition length */}'}
         durationInFrames={30 * VIDEO_FPS}
         fps={VIDEO_FPS}
         width={VIDEO_WIDTH}
@@ -225,9 +241,9 @@ function patchPackageJson({ outputDir }) {
   const newScripts = {
     'docs:screenshots': 'playwright test docs-automation/journeys/',
     'docs:preview':     'remotion preview docs-automation/Root.jsx',
-    'docs:render':      'remotion render docs-automation/Root.jsx --all',
+    'docs:render':      'remotion render docs-automation/Root.jsx ExampleJourney',
     'docs:generate':    'npm run docs:screenshots && npm run docs:render',
-    'docs:render:one':  'remotion render docs-automation/Root.jsx',
+    'docs:render:one':  'remotion render docs-automation/Root.jsx ExampleJourney',
   };
 
   Object.entries(newScripts).forEach(([key, val]) => {

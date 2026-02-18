@@ -62,6 +62,8 @@ function findSequenceBlocks(str) {
       }
       searchFrom = closeQuote + 1;
     }
+    // Known limitation: prop values with '>' inside template literals (e.g. label={\`score > 0\`})
+    // may in rare cases be misparsed; prefer simple quoted strings for props that contain '>'.
     const attrs = str.slice(afterTag, tagEnd).replace(/^\s+/, '').trim();
     const innerStart = tagEnd + 1;
     let depth = 1;
@@ -128,6 +130,7 @@ export function extractCaptions(compositionSource, fps = 30) {
       constants[name] = parseInt(rawValue, 10);
     }
   }
+  // Only resolves ALL_CAPS constants (e.g. STEP_DUR = 75). camelCase constants are not resolved by design.
   // Second pass: resolve expressions that reference other constants
   // (e.g. "3 * STEP", "FPS * 10", "STEP")
   const resolveExpr = (expr) => {
