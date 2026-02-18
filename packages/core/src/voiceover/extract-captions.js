@@ -38,7 +38,7 @@ function findSequenceBlocks(str) {
   while (pos < str.length) {
     const openStart = str.indexOf('<Sequence', pos);
     if (openStart === -1) break;
-    const afterTag = openStart + 8; // length of '<Sequence'
+    const afterTag = openStart + '<Sequence'.length;
     let tagEnd = str.indexOf('>', afterTag);
     if (tagEnd === -1) break;
     // If > is inside quotes, advance to the next >
@@ -56,8 +56,9 @@ function findSequenceBlocks(str) {
       const quoteChar = str[qPos];
       const closeQuote = str.indexOf(quoteChar, qPos + 1);
       if (closeQuote === -1 || closeQuote > nextGt) {
-        tagEnd = nextGt;
-        break;
+        // This '>' is inside a quoted value (or quote unclosed); skip it
+        searchFrom = nextGt + 1;
+        continue;
       }
       searchFrom = closeQuote + 1;
     }
@@ -66,21 +67,44 @@ function findSequenceBlocks(str) {
     let depth = 1;
     let i = innerStart;
     let innerEnd = innerStart;
+    let inString = false;
+    let quoteChar = null;
     while (depth > 0 && i < str.length) {
-      const nextOpen = str.indexOf('<Sequence', i);
-      const nextClose = str.indexOf('</Sequence>', i);
-      if (nextClose === -1) break;
-      if (nextOpen !== -1 && nextOpen < nextClose) {
+      if (inString) {
+        if (str[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (str[i] === quoteChar) {
+          inString = false;
+          quoteChar = null;
+          i++;
+          continue;
+        }
+        i++;
+        continue;
+      }
+      if (str[i] === '"' || str[i] === "'" || str[i] === '`') {
+        inString = true;
+        quoteChar = str[i];
+        i++;
+        continue;
+      }
+      if (str.substring(i, i + 9) === '<Sequence') {
         depth += 1;
-        i = nextOpen + 9;
-      } else {
+        i += 9;
+        continue;
+      }
+      if (str.substring(i, i + 11) === '</Sequence>') {
         depth -= 1;
         if (depth === 0) {
-          innerEnd = nextClose;
+          innerEnd = i;
           break;
         }
-        i = nextClose + 11;
+        i += 11;
+        continue;
       }
+      i++;
     }
     blocks.push({ attrs, block: str.slice(innerStart, innerEnd) });
     pos = innerEnd + 11;

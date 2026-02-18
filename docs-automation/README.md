@@ -35,6 +35,8 @@ cp .env.example .env
 #   GOOGLE_TTS_API_KEY=sua-api-key
 ```
 
+**Atenção:** O `.env` contém credenciais sensíveis (`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_TTS_API_KEY`) e **não deve ser versionado**. Inclua `.env` no `.gitignore` (ou evite fazer commit) para não expor segredos. Este arquivo é usado por `render.mjs` e por `voiceover-pipeline.js` (veja a seção "Credenciais para voiceover (opcional)" acima).
+
 O `dotenv` é carregado por `render.mjs` e pelo `voiceover-pipeline.js`; como os comandos são executados a partir da raiz, o `.env` deve ficar na raiz. Sem credenciais, o render continua funcionando — o vídeo é gerado sem áudio.
 
 ## Detalhes técnicos
