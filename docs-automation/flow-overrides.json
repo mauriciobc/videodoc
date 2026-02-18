@@ -1,0 +1,13 @@
+{
+  "AuthFlow": {
+    "composition": {
+      "fps": 30,
+      "width": 1920,
+      "height": 1080,
+      "durationInSeconds": 15,
+      "defaultProps": {
+        "appName": "Mealtime"
+      }
+    }
+  }
+}

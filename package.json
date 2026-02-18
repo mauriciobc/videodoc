@@ -9,19 +9,26 @@
     "test": "node --test packages/core/src/voiceover/extract-captions.test.js packages/core/src/playwright/helpers.test.js",
     "lint": "ESLINT_USE_FLAT_CONFIG=1 eslint packages/*/src/**/*.js",
     "release": "changeset publish",
-    "docs:preview": "npx remotion preview docs-automation/Root.jsx",
-    "docs:render": "node docs-automation/render.mjs",
-    "docs:generate": "npm run docs:render"
+    "docs:prerender": "node docs-automation/scripts/generate-root.mjs",
+    "docs:screenshots": "npx playwright test --config=docs-automation/playwright.config.js",
+    "docs:preview": "npm run docs:prerender && npx remotion preview docs-automation/Root.generated.jsx",
+    "docs:render": "npm run docs:prerender && node docs-automation/render.mjs",
+    "docs:generate": "npm run docs:screenshots && npm run docs:render",
+    "docs:server": "node docs-automation/server/index.mjs",
+    "docs:ui": "npx vite docs-automation/ui --config docs-automation/ui/vite.config.js --host --port 5174"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
     "@eslint/js": "^8.57.0",
     "@playwright/test": "^1.49.0",
     "@remotion/cli": "^4.0.424",
+    "express": "^5.1.0",
     "eslint": "^8.57.0",
+    "multer": "^2.0.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "remotion": "^4.0.424"
+    "remotion": "^4.0.424",
+    "vite": "^7.1.11"
   },
   "engines": {
     "node": ">=18.0.0"

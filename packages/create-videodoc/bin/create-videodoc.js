@@ -2,7 +2,7 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
-import { scaffold } from '../lib/scaffold.js';
+import { addUiScaffold, scaffold } from '../lib/scaffold.js';
 
 const pkg = { version: '0.1.0' };
 
@@ -11,12 +11,30 @@ console.log(chalk.gray('  Automated documentation video toolkit\n'));
 
 const args = process.argv.slice(2);
 
-if (args.length === 0 || args[0] !== 'init') {
-  console.log(chalk.yellow('Usage: npx create-videodoc init\n'));
+if (args.length === 0 || !['init', 'add-ui'].includes(args[0])) {
+  console.log(chalk.yellow('Usage: npx create-videodoc init | add-ui\n'));
   process.exit(0);
 }
 
 async function main() {
+  if (args[0] === 'add-ui') {
+    const spinner = ora('Adding docs server and UI scaffold...').start();
+    try {
+      await addUiScaffold();
+      spinner.succeed('UI/server scaffold complete!');
+      console.log(chalk.green('\n  Next steps:\n'));
+      console.log(chalk.white('  1.'), 'Install dependencies:', chalk.cyan('npm install'));
+      console.log(chalk.white('  2.'), 'Start server:', chalk.cyan('npm run docs:server'));
+      console.log(chalk.white('  3.'), 'Start UI:', chalk.cyan('npm run docs:ui'));
+      console.log();
+      return;
+    } catch (error) {
+      spinner.fail('Scaffold failed');
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+  }
+
   const answers = await inquirer.prompt([
     {
       type: 'input',

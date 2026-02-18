@@ -30,6 +30,7 @@ import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
+import { loadManifestWithOverrides, resolveFlowById, validateManifest } from './server/manifest-utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -38,13 +39,34 @@ const compositionId = process.argv[2] ?? 'AuthFlow';
 const outputLocation =
   process.argv[3] ?? path.join(__dirname, '..', 'docs-output', `${compositionId}.mp4`);
 
-const entryPoint = path.join(__dirname, 'Root.jsx');
+await import('./scripts/generate-root.mjs');
+
+const manifest = loadManifestWithOverrides();
+validateManifest(manifest);
+const flow = resolveFlowById(manifest, compositionId);
+const flowFps = flow.composition?.fps ?? manifest.defaults?.composition?.fps ?? 30;
+
+const entryPoint = path.join(__dirname, 'Root.generated.jsx');
 const compositionFile = path.join(__dirname, 'compositions', `${compositionId}.jsx`);
 
 // docs-output/ is the Remotion publicDir: staticFile('audio/X.mp3') resolves to
 // docs-output/audio/X.mp3, staticFile('screenshots/...') to docs-output/screenshots/...
 const publicDir = path.join(__dirname, '..', 'docs-output');
 const audioDir = path.join(publicDir, 'audio');
+const brandAssetsDir = path.join(__dirname, 'assets', 'brand');
+
+if (fs.existsSync(brandAssetsDir)) {
+  const targetBrandDir = path.join(publicDir, 'brand');
+  fs.mkdirSync(targetBrandDir, { recursive: true });
+  const entries = fs.readdirSync(brandAssetsDir);
+  for (const entry of entries) {
+    const source = path.join(brandAssetsDir, entry);
+    const target = path.join(targetBrandDir, entry);
+    if (fs.statSync(source).isFile()) {
+      fs.copyFileSync(source, target);
+    }
+  }
+}
 
 // ── Step 1: Voiceover ─────────────────────────────────────────────────────────
 
@@ -67,7 +89,7 @@ if (hasTTSCredentials) {
 
     if (existsSync(compositionFile)) {
       const source = readFileSync(compositionFile, 'utf-8');
-      const narration = extract(source, 30);
+      const narration = extract(source, flowFps);
       const narrationPath = compositionFile.replace(/\.(jsx?|tsx?)$/, '.narration.json');
       writeFileSync(narrationPath, JSON.stringify(narration, null, 2));
       console.log(`   ✓ Extracted ${narration.steps.length} caption(s)`);

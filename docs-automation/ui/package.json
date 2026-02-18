@@ -1,0 +1,17 @@
+{
+  "name": "videodoc-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --port 4174"
+  },
+  "dependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.11"
+  }
+}

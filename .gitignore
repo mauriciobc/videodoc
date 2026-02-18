@@ -5,6 +5,7 @@ test-results/
 playwright-report/
 docs-output/
 **/assets/screenshots/
+docs-automation/Root.generated.jsx
 out/
 .env
 .env.local
