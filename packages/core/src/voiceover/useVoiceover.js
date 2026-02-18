@@ -80,7 +80,7 @@ export function useVoiceover({
 
   useEffect(() => {
     if (!isReady) return;
-    const syncUrl = staticFile(audioPath.replace(/\.(mp3|wav)$/i, '.sync.json'));
+    const syncUrl = staticFile(audioPath.replace(/\.[^/]*$/, '') + '.sync.json');
     fetch(syncUrl)
       .then((res) => (res.ok ? res.json() : null))
       .then(setSyncData)

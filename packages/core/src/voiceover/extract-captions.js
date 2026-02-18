@@ -27,6 +27,67 @@
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Extracts balanced <Sequence>...</Sequence> blocks (handles nesting).
+ * Returns [{ attrs, block }, ...] where attrs is the string between
+ * <Sequence and >, and block is the inner content.
+ */
+function findSequenceBlocks(str) {
+  const blocks = [];
+  let pos = 0;
+  while (pos < str.length) {
+    const openStart = str.indexOf('<Sequence', pos);
+    if (openStart === -1) break;
+    const afterTag = openStart + 8; // length of '<Sequence'
+    let tagEnd = str.indexOf('>', afterTag);
+    if (tagEnd === -1) break;
+    // If > is inside quotes, advance to the next >
+    let searchFrom = afterTag;
+    while (true) {
+      const nextGt = str.indexOf('>', searchFrom);
+      if (nextGt === -1) break;
+      const between = str.slice(openStart, nextGt);
+      const quoteMatch = /["'`]/.exec(between);
+      if (!quoteMatch) {
+        tagEnd = nextGt;
+        break;
+      }
+      const qPos = openStart + quoteMatch.index;
+      const quoteChar = str[qPos];
+      const closeQuote = str.indexOf(quoteChar, qPos + 1);
+      if (closeQuote === -1 || closeQuote > nextGt) {
+        tagEnd = nextGt;
+        break;
+      }
+      searchFrom = closeQuote + 1;
+    }
+    const attrs = str.slice(afterTag, tagEnd).replace(/^\s+/, '').trim();
+    const innerStart = tagEnd + 1;
+    let depth = 1;
+    let i = innerStart;
+    let innerEnd = innerStart;
+    while (depth > 0 && i < str.length) {
+      const nextOpen = str.indexOf('<Sequence', i);
+      const nextClose = str.indexOf('</Sequence>', i);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        i = nextOpen + 9;
+      } else {
+        depth -= 1;
+        if (depth === 0) {
+          innerEnd = nextClose;
+          break;
+        }
+        i = nextClose + 11;
+      }
+    }
+    blocks.push({ attrs, block: str.slice(innerStart, innerEnd) });
+    pos = innerEnd + 11;
+  }
+  return blocks;
+}
+
 export function extractCaptions(compositionSource, fps = 30) {
   const steps = [];
 
@@ -63,16 +124,12 @@ export function extractCaptions(compositionSource, fps = 30) {
     return NaN;
   };
 
-  // ── Match Sequence blocks permissively (any attribute order) ──────────────
-  const sequencePattern = /<Sequence\b([\s\S]*?)>([\s\S]*?)<\/Sequence>/g;
+  // ── Match Sequence blocks (stack-based for nested <Sequence>) ─────────────
+  const sequenceBlocks = findSequenceBlocks(compositionSource);
   // Caption text: supports quoted strings with escapes (e.g. text="hello \"world\"")
   const captionTextPattern = /text=(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
 
-  let seqMatch;
-  while ((seqMatch = sequencePattern.exec(compositionSource)) !== null) {
-    const attrs = seqMatch[1];
-    const block = seqMatch[2];
-
+  for (const { attrs, block } of sequenceBlocks) {
     // Accept numeric literals AND constant/expression references, e.g.:
     //   from={90}  from={STEP}  from={STEP * 2}
     const fromMatch = attrs.match(/\bfrom=\{([^}]+)\}/);
@@ -83,6 +140,7 @@ export function extractCaptions(compositionSource, fps = 30) {
     const durationInFrames = resolveExpr(durationMatch[1]);
     if (isNaN(from) || isNaN(durationInFrames)) continue;
 
+    captionTextPattern.lastIndex = 0;
     let captionMatch;
     while ((captionMatch = captionTextPattern.exec(block)) !== null) {
       const rawText = captionMatch[2].replace(/\\(.)/g, '$1');

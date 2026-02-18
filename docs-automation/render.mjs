@@ -25,6 +25,7 @@
 
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
+import fs from 'fs';
 import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -121,6 +122,8 @@ console.log(`\n📦  Bundling ${compositionId}...`);
 const bundleLocation = await bundle({ entryPoint, webpackOverride, publicDir });
 
 // ── Step 3: Render ────────────────────────────────────────────────────────────
+
+fs.mkdirSync(path.dirname(outputLocation), { recursive: true });
 
 console.log(`🎬  Selecting composition: ${compositionId}`);
 const composition = await selectComposition({ serveUrl: bundleLocation, id: compositionId });

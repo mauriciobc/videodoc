@@ -221,7 +221,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
 
   const outputArg = args.find((a) => a.startsWith('--output='));
   const outputPath = outputArg
-    ? outputArg.split('=')[1]
+    ? outputArg.slice(outputArg.indexOf('=') + 1)
     : path.join(
         path.dirname(narrationPath),
         '../assets/audio',

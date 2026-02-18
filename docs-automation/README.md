@@ -24,6 +24,19 @@ Exemplo de vídeo tutorial do fluxo de login usando [mealtime.app.br](https://me
 - `npm install` na raiz (inclui `@playwright/test`, `@remotion/cli`, `remotion`, `react`, `react-dom`).
 - Chromium para Playwright: `npx playwright install chromium`.
 
+### Credenciais para voiceover (opcional)
+
+Para gerar narração em pt-BR com Google Cloud TTS, crie um arquivo **`.env` na raiz do repositório** (ao lado de `package.json`):
+
+```bash
+cp .env.example .env
+# Edite .env e preencha uma das opções:
+#   GOOGLE_APPLICATION_CREDENTIALS=/caminho/absoluto/para/service-account.json
+#   GOOGLE_TTS_API_KEY=sua-api-key
+```
+
+O `dotenv` é carregado por `render.mjs` e pelo `voiceover-pipeline.js`; como os comandos são executados a partir da raiz, o `.env` deve ficar na raiz. Sem credenciais, o render continua funcionando — o vídeo é gerado sem áudio.
+
 ## Detalhes técnicos
 
 ### Por que `render.mjs` em vez de `npx remotion render`?

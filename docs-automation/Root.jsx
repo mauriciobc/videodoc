@@ -10,7 +10,7 @@ const RemotionRoot = () => {
       <Composition
         id="AuthFlow"
         component={AuthFlow}
-        durationInFrames={DURATION_SEC * VIDEO_FPS}
+        durationInFrames={Math.round(DURATION_SEC * VIDEO_FPS)}
         fps={VIDEO_FPS}
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
