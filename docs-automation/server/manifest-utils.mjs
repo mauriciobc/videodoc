@@ -5,6 +5,7 @@ const DOCS_AUTOMATION_DIR = path.resolve(process.cwd(), 'docs-automation');
 const MANIFEST_PATH = path.join(DOCS_AUTOMATION_DIR, 'manifest.json');
 const FLOW_OVERRIDES_PATH = path.join(DOCS_AUTOMATION_DIR, 'flow-overrides.json');
 const PRODUCT_OVERRIDES_PATH = path.join(DOCS_AUTOMATION_DIR, 'product-overrides.json');
+const PROJECT_OVERRIDES_PATH = path.join(DOCS_AUTOMATION_DIR, 'project-overrides.json');
 
 const DEFAULT_COMPOSITION = {
   fps: 30,
@@ -14,12 +15,21 @@ const DEFAULT_COMPOSITION = {
   defaultProps: {},
 };
 
+const DEFAULT_VOICEOVER = {
+  languageCode: 'pt-BR',
+  name: 'pt-BR-Neural2-C',
+  speakingRate: 1.0,
+  pitch: 0.0,
+  volumeGainDb: 0.0,
+};
+
 export function getPaths() {
   return {
     docsAutomationDir: DOCS_AUTOMATION_DIR,
     manifestPath: MANIFEST_PATH,
     flowOverridesPath: FLOW_OVERRIDES_PATH,
     productOverridesPath: PRODUCT_OVERRIDES_PATH,
+    projectOverridesPath: PROJECT_OVERRIDES_PATH,
   };
 }
 
@@ -28,7 +38,11 @@ export function readJsonIfExists(filePath, fallback) {
     return fallback;
   }
 
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch (err) {
+    throw new Error(`Failed to parse JSON in ${filePath}: ${err.message}`);
+  }
 }
 
 export function loadManifestWithOverrides() {
@@ -39,11 +53,17 @@ export function loadManifestWithOverrides() {
 
   const flowOverrides = readJsonIfExists(FLOW_OVERRIDES_PATH, {});
   const productOverrides = readJsonIfExists(PRODUCT_OVERRIDES_PATH, {});
+  const projectOverrides = readJsonIfExists(PROJECT_OVERRIDES_PATH, {});
 
   const defaults = {
     composition: {
       ...DEFAULT_COMPOSITION,
       ...(manifest.defaults?.composition ?? {}),
+    },
+    voiceover: {
+      ...DEFAULT_VOICEOVER,
+      ...(manifest.defaults?.voiceover ?? {}),
+      ...(projectOverrides.voiceover ?? {}),
     },
   };
 
@@ -182,7 +202,19 @@ export function saveFlowOverride(flowId, patch) {
       },
     },
   };
-  fs.writeFileSync(FLOW_OVERRIDES_PATH, `${JSON.stringify(all, null, 2)}\n`, 'utf-8');
+  const dir = path.dirname(FLOW_OVERRIDES_PATH);
+  const tempPath = path.join(dir, `.flow-overrides.json.tmp.${process.pid}`);
+  try {
+    fs.writeFileSync(tempPath, `${JSON.stringify(all, null, 2)}\n`, 'utf-8');
+    fs.renameSync(tempPath, FLOW_OVERRIDES_PATH);
+  } catch (err) {
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_) {}
+    }
+    throw err;
+  }
 }
 
 export function saveProductOverride(productId, patch) {
@@ -204,6 +236,15 @@ export function saveProductOverride(productId, patch) {
     },
   };
   fs.writeFileSync(PRODUCT_OVERRIDES_PATH, `${JSON.stringify(all, null, 2)}\n`, 'utf-8');
+}
+
+export function saveVoiceoverOverride(patch) {
+  const all = readJsonIfExists(PROJECT_OVERRIDES_PATH, {});
+  all.voiceover = {
+    ...(all.voiceover ?? {}),
+    ...patch,
+  };
+  fs.writeFileSync(PROJECT_OVERRIDES_PATH, `${JSON.stringify(all, null, 2)}\n`, 'utf-8');
 }
 
 export function resolveProductEnv(product) {

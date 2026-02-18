@@ -16,7 +16,14 @@ const imports = manifest.flows
 
 const compositionBlocks = manifest.flows
   .map((flow) => {
-    const product = resolveProductById(manifest, flow.productId);
+    let product;
+    try {
+      product = resolveProductById(manifest, flow.productId);
+    } catch (err) {
+      throw new Error(
+        `Product not found for flow "${flow.id}" (productId: ${flow.productId}). ${err.message}`
+      );
+    }
     const composition = flow.composition ?? {};
     const fps = composition.fps ?? manifest.defaults.composition.fps;
     const width = composition.width ?? manifest.defaults.composition.width;

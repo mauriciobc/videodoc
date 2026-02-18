@@ -56,10 +56,24 @@ const PAUSE_BETWEEN_STEPS_MS = 800;
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 
 export async function generateVoiceover(narrationPath, outputPath, options = {}) {
-  const { voiceName = VOICE_CONFIG.name, speakingRate = AUDIO_CONFIG.speakingRate } = options;
+  // Merge provided options with defaults.
+  // We support both the new structure (voice, audioConfig objects) and legacy flat options (voiceName, speakingRate).
+  
+  const voiceConfig = {
+    ...VOICE_CONFIG,
+    ...(options.voice || {}),
+  };
+  if (options.voiceName) {
+    voiceConfig.name = options.voiceName;
+  }
 
-  const voiceConfig = { ...VOICE_CONFIG, name: voiceName };
-  const audioConfig = { ...AUDIO_CONFIG, speakingRate };
+  const audioConfig = {
+    ...AUDIO_CONFIG,
+    ...(options.audioConfig || {}),
+  };
+  if (options.speakingRate !== undefined) {
+    audioConfig.speakingRate = options.speakingRate;
+  }
 
   const narration = JSON.parse(fs.readFileSync(narrationPath, 'utf-8'));
   const { steps } = narration;

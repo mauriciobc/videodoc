@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const EMPTY_STEPS = {
   screenshots: 'pending',
@@ -12,6 +12,8 @@ export function App() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [outputs, setOutputs] = useState({});
   const [jobs, setJobs] = useState({});
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
   const [error, setError] = useState('');
 
   const [brandForm, setBrandForm] = useState({
@@ -36,14 +38,17 @@ export function App() {
       .map(([id]) => id);
 
     if (ids.length === 0) return;
-    const timer = setInterval(async () => {
-      for (const id of ids) {
-        await refreshJob(id);
+    const timer = setInterval(() => {
+      const currentIds = Object.entries(jobsRef.current)
+        .filter(([, job]) => job.status === 'running' || job.status === 'pending')
+        .map(([id]) => id);
+      if (currentIds.length > 0) {
+        Promise.all(currentIds.map((id) => refreshJob(id)));
       }
     }, 2000);
 
     return () => clearInterval(timer);
-  }, [jobs]);
+  }, [jobs, refreshJob]);
 
   const filteredFlows = useMemo(() => {
     if (!selectedProductId) return [];
@@ -72,16 +77,38 @@ export function App() {
   }
 
   async function loadProduct(productId) {
-    const res = await fetch(`/api/products/${productId}`);
-    const data = await res.json();
-    const colors = data.brand?.colors ?? {};
-    setBrandForm((prev) => ({
-      ...prev,
-      accent: colors.accent ?? '#6366f1',
-      accentAlt: colors.accentAlt ?? '#8b5cf6',
-      background: colors.background ?? '#0f0f0f',
-      logoFile: null,
-    }));
+    try {
+      const res = await fetch(`/api/products/${productId}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Falha ao carregar produto.');
+        setBrandForm((prev) => ({
+          ...prev,
+          accent: '#6366f1',
+          accentAlt: '#8b5cf6',
+          background: '#0f0f0f',
+          logoFile: null,
+        }));
+        return;
+      }
+      const colors = data.brand?.colors ?? {};
+      setBrandForm((prev) => ({
+        ...prev,
+        accent: colors.accent ?? '#6366f1',
+        accentAlt: colors.accentAlt ?? '#8b5cf6',
+        background: colors.background ?? '#0f0f0f',
+        logoFile: null,
+      }));
+    } catch (err) {
+      setError(err.message ?? 'Falha ao carregar produto.');
+      setBrandForm((prev) => ({
+        ...prev,
+        accent: '#6366f1',
+        accentAlt: '#8b5cf6',
+        background: '#0f0f0f',
+        logoFile: null,
+      }));
+    }
   }
 
   async function saveBrand(event) {
@@ -145,7 +172,7 @@ export function App() {
     }));
   }
 
-  async function refreshJob(jobId) {
+  const refreshJob = useCallback(async (jobId) => {
     const res = await fetch(`/api/jobs/${jobId}`);
     if (!res.ok) return;
     const data = await res.json();
@@ -153,7 +180,7 @@ export function App() {
     if (data.status === 'done') {
       await refreshOutput(data.flowId);
     }
-  }
+  }, []);
 
   async function refreshOutput(flowId) {
     const res = await fetch(`/api/flows/${flowId}/output`);
@@ -234,6 +261,8 @@ export function App() {
           <button type="submit">Salvar marca</button>
         </form>
       </section>
+
+      <VoiceoverSettings />
 
       <section className="flows">
         {filteredFlows.map((flow) => (
@@ -325,7 +354,14 @@ function FlowCard({ flow, output, jobs, onSave, onGenerate }) {
 
       <div className="actions">
         <button onClick={() => onSave(flow.id, local)}>Salvar configuração</button>
-        <button onClick={() => onGenerate(flow.id)}>Gerar vídeo</button>
+        <button
+            type="button"
+            disabled={!!activeJob}
+            aria-disabled={!!activeJob}
+            onClick={() => onGenerate(flow.id)}
+          >
+            Gerar vídeo
+          </button>
       </div>
 
       <p className="muted">Última geração: {generatedAt}</p>
@@ -362,5 +398,146 @@ function normalizeComposition(composition) {
       appName: composition?.defaultProps?.appName ?? '',
     },
   };
+}
+
+function VoiceoverSettings() {
+  const [settings, setSettings] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isCustom, setIsCustom] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/voiceover/settings').then((r) => r.json()),
+      fetch('/api/voiceover/voices').then((r) => r.json()),
+    ])
+      .then(([s, v]) => {
+        setSettings(s);
+        setVoices(v);
+        // Check if current voice is in the list
+        const known = v.find((x) => x.name === s.name);
+        setIsCustom(!known);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+
+  async function save(e) {
+    e.preventDefault();
+    setError(null);
+    try {
+      const res = await fetch('/api/voiceover/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSettings(data);
+      const known = voices.find((x) => x.name === data.name);
+      setIsCustom(!known);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  if (loading) return <p>Carregando voz...</p>;
+
+  return (
+    <section className="card">
+      <h2>Narração (Voice-over)</h2>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={save} className="grid">
+        <label>
+          Voz
+          <select
+            value={isCustom ? 'custom' : settings?.name ?? ''}
+            onChange={(e) => {
+              if (e.target.value === 'custom') {
+                setIsCustom(true);
+                return;
+              }
+              const v = voices.find((x) => x.name === e.target.value);
+              if (v) {
+                setIsCustom(false);
+                setSettings((prev) => ({
+                  ...prev,
+                  name: v.name,
+                  languageCode: v.languageCode,
+                }));
+              }
+            }}
+          >
+            {voices.map((v) => (
+              <option key={v.name} value={v.name}>
+                {v.name} ({v.gender}, {v.type})
+              </option>
+            ))}
+            <option value="custom">Outra (Personalizada)</option>
+          </select>
+        </label>
+
+        {isCustom && (
+          <label>
+            Nome da Voz (Google Cloud TTS)
+            <input
+              type="text"
+              value={settings?.name ?? ''}
+              onChange={(e) => setSettings((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="ex: pt-BR-Neural2-C"
+            />
+            <small className="muted">O código do idioma será inferido (ex: pt-BR).</small>
+          </label>
+        )}
+
+        <label>
+          Velocidade (Speaking Rate): {settings?.speakingRate}x
+          <input
+            type="range"
+            min="0.25"
+            max="2.0"
+            step="0.05"
+            value={settings?.speakingRate ?? 1.0}
+            onChange={(e) =>
+              setSettings((prev) => ({ ...prev, speakingRate: Number(e.target.value) }))
+            }
+          />
+        </label>
+
+        <label>
+          Tom (Pitch): {settings?.pitch}
+          <input
+            type="range"
+            min="-20"
+            max="20"
+            step="0.1"
+            value={settings?.pitch ?? 0}
+            onChange={(e) => setSettings((prev) => ({ ...prev, pitch: Number(e.target.value) }))}
+          />
+        </label>
+
+        <label>
+          Volume (dB): {settings?.volumeGainDb}
+          <input
+            type="range"
+            min="-10"
+            max="10"
+            step="0.1"
+            value={settings?.volumeGainDb ?? 0}
+            onChange={(e) =>
+              setSettings((prev) => ({ ...prev, volumeGainDb: Number(e.target.value) }))
+            }
+          />
+          <small className="muted">Recomendado: -6 a +6 dB</small>
+        </label>
+
+        <button type="submit">Salvar Narração</button>
+      </form>
+    </section>
+  );
 }
 

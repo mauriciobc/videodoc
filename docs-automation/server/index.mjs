@@ -11,8 +11,18 @@ import {
   resolveProductEnv,
   saveFlowOverride,
   saveProductOverride,
+  saveVoiceoverOverride,
   validateManifest,
 } from './manifest-utils.mjs';
+
+const VOICES_LIST = [
+  { name: 'pt-BR-Neural2-C', languageCode: 'pt-BR', gender: 'FEMALE', type: 'Neural2' },
+  { name: 'pt-BR-Neural2-A', languageCode: 'pt-BR', gender: 'FEMALE', type: 'Neural2' },
+  { name: 'pt-BR-Neural2-B', languageCode: 'pt-BR', gender: 'MALE', type: 'Neural2' },
+  { name: 'pt-BR-Wavenet-A', languageCode: 'pt-BR', gender: 'FEMALE', type: 'WaveNet' },
+  { name: 'pt-BR-Wavenet-B', languageCode: 'pt-BR', gender: 'MALE', type: 'WaveNet' },
+  { name: 'pt-BR-Standard-A', languageCode: 'pt-BR', gender: 'FEMALE', type: 'Standard' },
+];
 
 const PORT = Number(process.env.DOCS_SERVER_PORT ?? 3333);
 const app = express();
@@ -22,7 +32,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 const { docsAutomationDir } = getPaths();
 const repoRoot = process.cwd();
 const docsOutputDir = path.join(repoRoot, 'docs-output');
+const docsOutputDirResolved = path.resolve(docsOutputDir);
 const brandDir = path.join(docsAutomationDir, 'assets', 'brand');
+const JOB_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 fs.mkdirSync(docsOutputDir, { recursive: true });
 fs.mkdirSync(brandDir, { recursive: true });
@@ -32,6 +44,54 @@ app.use('/assets/brand', express.static(brandDir));
 
 // Fail fast if manifest is broken.
 validateManifest(loadManifestWithOverrides());
+
+app.get('/api/voiceover/settings', (req, res) => {
+  const manifest = loadManifestWithOverrides();
+  res.json(manifest.defaults.voiceover);
+});
+
+app.get('/api/voiceover/voices', (req, res) => {
+  res.json(VOICES_LIST);
+});
+
+app.patch('/api/voiceover/settings', (req, res) => {
+  try {
+    const patch = req.body ?? {};
+    
+    // Validation
+    if (patch.speakingRate != null) {
+      if (typeof patch.speakingRate !== 'number' || patch.speakingRate < 0.25 || patch.speakingRate > 2.0) {
+        throw new Error('speakingRate deve estar entre 0.25 e 2.0');
+      }
+    }
+    if (patch.pitch != null) {
+      if (typeof patch.pitch !== 'number' || patch.pitch < -20 || patch.pitch > 20) {
+        throw new Error('pitch deve estar entre -20 e 20');
+      }
+    }
+    if (patch.volumeGainDb != null) {
+      if (typeof patch.volumeGainDb !== 'number' || patch.volumeGainDb < -96 || patch.volumeGainDb > 16) {
+        throw new Error('volumeGainDb deve estar entre -96 e 16');
+      }
+    }
+    if (patch.name) {
+      // Auto-infer languageCode if not provided and matches pattern
+      if (!patch.languageCode && /^[a-z]{2}-[A-Z]{2}-/.test(patch.name)) {
+        patch.languageCode = patch.name.split('-').slice(0, 2).join('-');
+      }
+      
+      if (!patch.languageCode) {
+        throw new Error('languageCode é obrigatório quando name é fornecido (se não for possível inferir).');
+      }
+    }
+
+    saveVoiceoverOverride(patch);
+    const manifest = loadManifestWithOverrides();
+    res.json(manifest.defaults.voiceover);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 app.get('/api/products', (_req, res) => {
   const manifest = loadManifestWithOverrides();
@@ -128,8 +188,12 @@ app.post('/api/flows/:flowId/generate', async (req, res) => {
       job.status = 'error';
       job.error = error.message;
       appendLog(job, `[error] ${error.message}`);
+      scheduleJobRemoval(job.id);
     });
   } catch (error) {
+    if (error.message && error.message.includes('não encontrado no manifesto')) {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -143,9 +207,20 @@ app.get('/api/jobs/:jobId', (req, res) => {
   res.json(job);
 });
 
+function validateAndResolveFlowOutputPath(flowId) {
+  if (!flowId || typeof flowId !== 'string') return null;
+  if (!/^[a-zA-Z0-9_-]+$/.test(flowId)) return null;
+  const outputFile = path.resolve(docsOutputDir, `${flowId}.mp4`);
+  if (!outputFile.startsWith(docsOutputDirResolved)) return null;
+  return outputFile;
+}
+
 app.get('/api/flows/:flowId/output', (req, res) => {
   const flowId = req.params.flowId;
-  const outputFile = path.join(docsOutputDir, `${flowId}.mp4`);
+  const outputFile = validateAndResolveFlowOutputPath(flowId);
+  if (!outputFile) {
+    return res.status(400).json({ error: 'Invalid flowId' });
+  }
   const exists = fs.existsSync(outputFile);
 
   if (!exists) {
@@ -166,7 +241,10 @@ app.get('/api/flows/:flowId/output', (req, res) => {
 
 app.get('/api/flows/:flowId/output/file', (req, res) => {
   const flowId = req.params.flowId;
-  const outputFile = path.join(docsOutputDir, `${flowId}.mp4`);
+  const outputFile = validateAndResolveFlowOutputPath(flowId);
+  if (!outputFile) {
+    return res.status(400).json({ error: 'Invalid flowId' });
+  }
   if (!fs.existsSync(outputFile)) {
     return res.status(404).json({ error: 'Arquivo ainda não foi gerado.' });
   }
@@ -196,6 +274,12 @@ function createJob(flowId) {
   return id;
 }
 
+function scheduleJobRemoval(jobId) {
+  setTimeout(() => {
+    jobs.delete(jobId);
+  }, JOB_TTL_MS);
+}
+
 async function runGeneratePipeline(job, flow, env) {
   job.status = 'running';
 
@@ -221,6 +305,7 @@ async function runGeneratePipeline(job, flow, env) {
     job.steps.voiceover = 'done';
   }
   job.status = 'done';
+  scheduleJobRemoval(job.id);
 }
 
 async function runCommand(parts, env, job) {

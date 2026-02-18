@@ -155,7 +155,8 @@ export const theme = mergeTheme({
 `;
 }
 
-function manifestFile({ projectName, baseUrl, primaryColor, fps, resolution }) {
+function manifestFile({ projectName, productId, baseUrl, primaryColor, fps, resolution }) {
+  const resolvedProductId = productId ?? slugify(projectName) ?? 'default-product';
   return JSON.stringify({
     version: 1,
     defaults: {
@@ -167,7 +168,7 @@ function manifestFile({ projectName, baseUrl, primaryColor, fps, resolution }) {
     },
     products: [
       {
-        id: slugify(projectName) || 'default-product',
+        id: resolvedProductId,
         name: projectName,
         baseURL: baseUrl,
         brand: {
@@ -182,7 +183,7 @@ function manifestFile({ projectName, baseUrl, primaryColor, fps, resolution }) {
     flows: [
       {
         id: 'ExampleJourney',
-        productId: slugify(projectName) || 'default-product',
+        productId: resolvedProductId,
         label: 'Example Journey',
         journeyFile: 'example-journey.spec.js',
         screenshotsDir: 'screenshots/example-journey',

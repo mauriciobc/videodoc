@@ -64,6 +64,8 @@ npm run docs:render
 | `npm run docs:render` | Renders all compositions to `.mp4` |
 | `npm run docs:generate` | Screenshots + render in one command |
 | `npm run docs:render:one` | Render a single named composition |
+| `npm run docs:server` | Starts a local server for API mocking (optional) |
+| `npm run docs:ui` | Starts the UI development server (optional) |
 
 ---
 
@@ -71,6 +73,7 @@ npm run docs:render
 
 ```
 docs-automation/
+  manifest.json            ← Central configuration for products and flows
   playwright.config.js     ← Playwright config for your project
   remotion.config.js       ← Remotion config (fps, resolution)
   theme.js                 ← Brand colors & typography
@@ -116,6 +119,25 @@ test('Journey: Log a feeding', async ({ page }) => {
 
   // ... continue for each step
 });
+```
+
+### Capturing Video Clips
+
+For interactions that require motion (animations, drag-and-drop), use `recordClip`:
+
+```js
+import { recordClip } from '@videodoc/core/playwright';
+
+test('Journey: Drag and Drop', async ({ page }) => {
+  // ... setup ...
+
+  // Records a .webm video of the interaction
+  await recordClip(page, '03-drag-interaction', OUT(''), async (p) => {
+    // Perform actions on the 'p' instance
+    await p.dragAndDrop('#source', '#target');
+  });
+});
+```
 ```
 
 **Tips:**
@@ -166,6 +188,27 @@ export const LogFeeding = () => (
   </AbsoluteFill>
 );
 ```
+
+### Adding Voiceover
+
+The toolkit includes a voiceover pipeline that uses Google Cloud Text-to-Speech.
+
+1.  **Ensure you have Google Cloud credentials** set up (`GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_TTS_API_KEY`).
+2.  **Add voiceover** to your composition:
+
+    ```bash
+    # Run the voiceover pipeline for a specific composition (extracts captions -> generates audio)
+    node node_modules/@videodoc/core/src/voiceover/voiceover-pipeline.js docs-automation/compositions/LogFeeding.jsx
+    ```
+
+3.  **Import the audio** in your composition:
+
+    ```jsx
+    import { Audio, staticFile } from 'remotion';
+
+    // Inside your component
+    <Audio src={staticFile('audio/LogFeeding-voiceover.mp3')} />
+    ```
 
 **Timing reference:** At 30fps, 30 frames = 1 second. 90 frames = 3 seconds per step is a comfortable reading pace.
 

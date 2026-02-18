@@ -35,6 +35,8 @@ let fps = parseInt(getArg('--fps', '30'), 10);
 const outputDir = getArg('--output', './assets/audio');
 const voiceName = getArg('--voice', 'pt-BR-Neural2-C');
 let speakingRate = parseFloat(getArg('--rate', '1.0'));
+let pitch = parseFloat(getArg('--pitch', '0.0'));
+let volumeGainDb = parseFloat(getArg('--volume', '0.0'));
 
 if (!Number.isFinite(fps) || !Number.isInteger(fps) || fps <= 0) {
   console.error(`Invalid --fps: must be a positive integer. Got: ${getArg('--fps', '30')}`);
@@ -44,6 +46,16 @@ if (!Number.isFinite(speakingRate) || speakingRate < 0.25 || speakingRate > 4) {
   const raw = getArg('--rate', '1.0');
   console.error(`Invalid --rate: must be 0.25–4.0. Got: ${raw}`);
   process.exit(1);
+}
+if (!Number.isFinite(pitch) || pitch < -20 || pitch > 20) {
+    const raw = getArg('--pitch', '0.0');
+    console.error(`Invalid --pitch: must be -20.0–20.0. Got: ${raw}`);
+    process.exit(1);
+}
+if (!Number.isFinite(volumeGainDb) || volumeGainDb < -96 || volumeGainDb > 16) {
+    const raw = getArg('--volume', '0.0');
+    console.error(`Invalid --volume: must be -96.0–16.0. Got: ${raw}`);
+    process.exit(1);
 }
 const skipExtract     = args.includes('--skip-extract');
 const dryRun          = args.includes('--dry-run');
@@ -131,8 +143,12 @@ const compositionName = path.basename(compositionPath, path.extname(compositionP
 const outputPath = path.join(outputDir, `${compositionName}-voiceover.mp3`);
 
 await generateVoiceover(narrationPath, outputPath, {
-  voiceName,
-  speakingRate,
+  voice: { name: voiceName },
+  audioConfig: {
+    speakingRate,
+    pitch,
+    volumeGainDb,
+  },
 });
 
 // ── Step 3: Print Remotion usage snippet ─────────────────────────────────────

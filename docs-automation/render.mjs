@@ -96,7 +96,14 @@ if (hasTTSCredentials) {
 
       const audioPath = path.join(audioDir, `${compositionId}-voiceover.mp3`);
       mkdirSync(audioDir, { recursive: true });
-      await generateVoiceover(narrationPath, audioPath);
+      
+      const voiceoverSettings = manifest.defaults?.voiceover ?? {};
+      console.log(`   🗣  Voice: ${voiceoverSettings.name ?? 'default'} (${voiceoverSettings.languageCode ?? 'default'})`);
+      
+      await generateVoiceover(narrationPath, audioPath, {
+        voice: voiceoverSettings,
+        audioConfig: voiceoverSettings,
+      });
     } else {
       console.warn(`   ⚠  Composition file not found: ${compositionFile}`);
     }
