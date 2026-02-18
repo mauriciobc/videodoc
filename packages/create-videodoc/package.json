@@ -1,0 +1,16 @@
+{
+  "name": "create-videodoc",
+  "version": "0.1.0",
+  "description": "CLI scaffolder for videodoc — automated documentation video toolkit",
+  "main": "bin/create-videodoc.js",
+  "type": "module",
+  "bin": { "create-videodoc": "bin/create-videodoc.js" },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1"
+  },
+  "keywords": ["remotion", "playwright", "docs", "documentation", "scaffolder"],
+  "license": "MIT",
+  "engines": { "node": ">=18.0.0" }
+}

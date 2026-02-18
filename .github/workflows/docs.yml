@@ -1,0 +1,32 @@
+name: Generate Documentation Videos
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Start dev server
+        run: npm run dev &
+      - name: Wait for dev server
+        run: npx wait-on http://localhost:3000
+      - name: Generate screenshots
+        run: npm run docs:screenshots
+      - name: Render videos
+        run: npm run docs:render
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-videos
+          path: docs-output/
+          retention-days: 30
