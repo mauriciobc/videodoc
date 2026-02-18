@@ -10,9 +10,11 @@
  * so Remotion can load it with a matching delayInFrames offset.
  *
  * Requirements:
- *   - GOOGLE_APPLICATION_CREDENTIALS env var pointing to your service account JSON
- *   - OR GOOGLE_TTS_API_KEY env var for API key auth
- *   - npm packages: @google-cloud/text-to-speech, fluent-ffmpeg, ffmpeg-static
+ *   - Auth via Application Default Credentials (ADC):
+ *     - GOOGLE_APPLICATION_CREDENTIALS = path to service account JSON, OR
+ *     - gcloud auth application-default login (no env var needed)
+ *   - Cloud TTS does NOT support API keys; see https://cloud.google.com/text-to-speech/docs/create-audio-text-client-libraries
+ *   - npm packages: @google-cloud/text-to-speech, ffmpeg-static
  *
  * Usage:
  *   node generate-voiceover.js <narration.json> [--output=./audio/voiceover.mp3]
@@ -98,7 +100,7 @@ export async function generateVoiceover(narrationPath, outputPath, options = {})
 
     console.log(`  [${stepLabel}/${steps.length}] "${text.length > 55 ? text.slice(0, 55) + '...' : text}"`);
 
-    // Call Google TTS
+    // Call Google TTS (uses ADC: GOOGLE_APPLICATION_CREDENTIALS or gcloud auth application-default login)
     await synthesizeSpeech(client, text, segPath, voiceConfig, audioConfig);
     segmentPaths.push(segPath);
 

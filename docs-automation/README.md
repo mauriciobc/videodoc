@@ -26,18 +26,21 @@ Exemplo de vídeo tutorial do fluxo de login usando [mealtime.app.br](https://me
 
 ### Credenciais para voiceover (opcional)
 
-Para gerar narração em pt-BR com Google Cloud TTS, crie um arquivo **`.env` na raiz do repositório** (ao lado de `package.json`):
+A Cloud Text-to-Speech **não usa API key**; usa OAuth2 (Application Default Credentials). Duas formas:
 
-```bash
-cp .env.example .env
-# Edite .env e preencha uma das opções:
-#   GOOGLE_APPLICATION_CREDENTIALS=/caminho/absoluto/para/service-account.json
-#   GOOGLE_TTS_API_KEY=sua-api-key
-```
+**Opção A — gcloud (recomendado para uso local)**  
+Siga o [guia oficial](https://docs.cloud.google.com/text-to-speech/docs/create-audio-text-client-libraries?hl=pt-br#client-libraries-install-nodejs):
 
-**Atenção:** O `.env` contém credenciais sensíveis (`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_TTS_API_KEY`) e **não deve ser versionado**. Inclua `.env` no `.gitignore` (ou evite fazer commit) para não expor segredos. Este arquivo é usado por `render.mjs` e por `voiceover-pipeline.js` (veja a seção "Credenciais para voiceover (opcional)" acima).
+1. Instale a [CLI do Google Cloud](https://cloud.google.com/sdk/docs/install).
+2. `gcloud init` e faça login no projeto com a API Text-to-Speech ativada.
+3. Crie credenciais locais: `gcloud auth application-default login`
+4. Rode `npm run docs:voiceover` (depois `npm run docs:render`). Nenhum `.env` é necessário.
 
-O `dotenv` é carregado por `render.mjs` e pelo `voiceover-pipeline.js`; como os comandos são executados a partir da raiz, o `.env` deve ficar na raiz. Sem credenciais, o render continua funcionando — o vídeo é gerado sem áudio.
+**Opção B — Service account (CI/CD)**  
+Crie `.env` na raiz com:
+`GOOGLE_APPLICATION_CREDENTIALS=/caminho/absoluto/para/sua-service-account.json`
+
+**Atenção:** `.env` não deve ser versionado. Sem credenciais, o render gera o vídeo sem áudio.
 
 ## Detalhes técnicos
 
