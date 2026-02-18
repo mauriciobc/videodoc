@@ -237,11 +237,11 @@ function patchPackageJson({ outputDir }) {
   });
 
   const suggestedDevDeps = {
-    '@videodoc/core': 'latest',
-    '@playwright/test': 'latest',
-    'remotion': 'latest',
-    'react': 'latest',
-    'react-dom': 'latest',
+    '@videodoc/core': '^0.1.0',
+    '@playwright/test': '^1.40.0',
+    'remotion': '^4.0.0',
+    'react': '^18.2.0',
+    'react-dom': '^18.2.0',
   };
   Object.entries(suggestedDevDeps).forEach(([dep, version]) => {
     if (!(dep in pkg.devDependencies)) {

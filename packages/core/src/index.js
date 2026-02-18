@@ -11,16 +11,5 @@ export { BaseComposition } from './remotion/BaseComposition.jsx';
 // Theme
 export { defaultTheme, mergeTheme } from './remotion/theme.js';
 
-// Playwright Helpers
-export {
-  capture,
-  captureFullPage,
-  setupLocalStorageState,
-  setupApiState,
-  waitAndCapture,
-  hoverAndCapture,
-  resetToFreshState,
-  defaultSlowMo,
-} from './playwright/helpers.js';
-
-export { createFixture } from './playwright/fixtures.js';
+// Playwright Helpers are available via '@videodoc/core/playwright' (Node.js only).
+// They are intentionally NOT exported here to keep this entry point browser-safe.

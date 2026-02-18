@@ -85,15 +85,21 @@ export async function generateVoiceover(narrationPath, outputPath, options = {})
 
   // ── Generate each step ─────────────────────────────────────────────────────
   for (let i = 0; i < steps.length; i++) {
-    const step       = steps[i];
-    const stepLabel  = String(i + 1).padStart(2, '0');
-    const segPath    = path.join(tmpDir, `${stepLabel}-step.mp3`);
-    const pausePath  = path.join(tmpDir, `${stepLabel}-pause.mp3`);
+    const step = steps[i];
+    const stepLabel = String(i + 1).padStart(2, '0');
+    const text = typeof step.text === 'string' ? step.text.trim() : '';
+    if (!text) {
+      console.warn(`  [${stepLabel}/${steps.length}] Skipping step with empty/undefined text.`);
+      continue;
+    }
 
-    console.log(`  [${stepLabel}/${steps.length}] "${step.text.slice(0, 55)}..."`);
+    const segPath = path.join(tmpDir, `${stepLabel}-step.mp3`);
+    const pausePath = path.join(tmpDir, `${stepLabel}-pause.mp3`);
+
+    console.log(`  [${stepLabel}/${steps.length}] "${text.length > 55 ? text.slice(0, 55) + '...' : text}"`);
 
     // Call Google TTS
-    await synthesizeSpeech(client, step.text, segPath, voiceConfig, audioConfig);
+    await synthesizeSpeech(client, text, segPath, voiceConfig, audioConfig);
     segmentPaths.push(segPath);
 
     // Add inter-step pause (except after the last step)
@@ -112,7 +118,10 @@ export async function generateVoiceover(narrationPath, outputPath, options = {})
 
   // ── Write a sync manifest ─────────────────────────────────────────────────
   // This tells Remotion exactly where to start the audio track
-  const manifestPath = outputPath.replace(/\.(mp3|wav)$/, '.sync.json');
+  const parsed = path.parse(outputPath);
+  const manifestPath = /\.(mp3|wav)$/i.test(outputPath)
+    ? path.join(parsed.dir, parsed.name + '.sync.json')
+    : path.join(parsed.dir, parsed.base + '.sync.json');
   const manifest = {
     audioFile:        path.basename(outputPath),
     delayInFrames:    0, // audio starts at frame 0 (lead silence handles offset)
@@ -176,7 +185,7 @@ async function stitchAudio(segmentPaths, outputPath) {
   const listPath = outputPath + '.concat.txt';
 
   const listContent = segmentPaths
-    .map((p) => `file '${path.resolve(p)}'`)
+    .map((p) => `file '${path.resolve(p).replace(/'/g, "'\\''")}'`)
     .join('\n');
   fs.writeFileSync(listPath, listContent, 'utf-8');
 
@@ -202,21 +211,22 @@ async function getFfmpegPath() {
 // ── CLI entry point ──────────────────────────────────────────────────────────
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  const args          = process.argv.slice(2);
+  const args = process.argv.slice(2);
   const narrationPath = args.find((a) => !a.startsWith('--'));
-  const outputArg     = args.find((a) => a.startsWith('--output='));
-  const outputPath    = outputArg
+
+  if (!narrationPath) {
+    console.error('Usage: node generate-voiceover.js <narration.json> [--output=path/to/out.mp3]');
+    process.exit(1);
+  }
+
+  const outputArg = args.find((a) => a.startsWith('--output='));
+  const outputPath = outputArg
     ? outputArg.split('=')[1]
     : path.join(
         path.dirname(narrationPath),
         '../assets/audio',
         path.basename(narrationPath).replace('.narration.json', '-voiceover.mp3')
       );
-
-  if (!narrationPath) {
-    console.error('Usage: node generate-voiceover.js <narration.json> [--output=path/to/out.mp3]');
-    process.exit(1);
-  }
 
   generateVoiceover(narrationPath, outputPath).catch((err) => {
     console.error('Voiceover generation failed:', err.message);

@@ -20,7 +20,7 @@ jobs:
       - name: Start dev server
         run: npm run dev &
       - name: Wait for dev server
-        run: npx wait-on http://localhost:3000
+        run: npx wait-on http://localhost:3000 --timeout 60000
       - name: Generate screenshots
         run: npm run docs:screenshots
       - name: Render videos

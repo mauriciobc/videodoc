@@ -29,12 +29,22 @@ import 'dotenv/config';
 
 // ── Parse CLI args ────────────────────────────────────────────────────────────
 
-const args            = process.argv.slice(2);
+const args = process.argv.slice(2);
 const compositionPath = args.find((a) => !a.startsWith('--'));
-const fps             = parseInt(getArg('--fps', '30'), 10);
-const outputDir       = getArg('--output', './assets/audio');
-const voiceName       = getArg('--voice', 'pt-BR-Neural2-C');
-const speakingRate    = parseFloat(getArg('--rate', '1.0'));
+let fps = parseInt(getArg('--fps', '30'), 10);
+const outputDir = getArg('--output', './assets/audio');
+const voiceName = getArg('--voice', 'pt-BR-Neural2-C');
+let speakingRate = parseFloat(getArg('--rate', '1.0'));
+
+if (!Number.isFinite(fps) || !Number.isInteger(fps) || fps <= 0) {
+  console.error(`Invalid --fps: must be a positive integer. Got: ${getArg('--fps', '30')}`);
+  process.exit(1);
+}
+if (!Number.isFinite(speakingRate) || speakingRate < 0.25 || speakingRate > 4) {
+  const raw = getArg('--rate', '1.0');
+  console.error(`Invalid --rate: must be 0.25–4.0. Got: ${raw}`);
+  process.exit(1);
+}
 const skipExtract     = args.includes('--skip-extract');
 const dryRun          = args.includes('--dry-run');
 
@@ -67,9 +77,15 @@ See: https://cloud.google.com/text-to-speech/docs/quickstart
 
 // ── Step 1: Extract captions ──────────────────────────────────────────────────
 
-const narrationPath = compositionPath.replace(/\.(jsx?|tsx?)$/, '.narration.json');
+const narrationPath = /\.(jsx?|tsx?)$/.test(compositionPath)
+  ? compositionPath.replace(/\.(jsx?|tsx?)$/, '.narration.json')
+  : path.join(path.dirname(compositionPath), path.basename(compositionPath, path.extname(compositionPath)) + '.narration.json');
 
 if (!skipExtract) {
+  if (!fs.existsSync(compositionPath)) {
+    console.error(`Composition file not found: ${compositionPath}`);
+    process.exit(1);
+  }
   console.log(`\n📖  Extracting captions from ${path.basename(compositionPath)}...`);
   const source = fs.readFileSync(compositionPath, 'utf-8');
   const result = extractCaptions(source, fps);
@@ -96,11 +112,20 @@ if (!skipExtract) {
 }
 
 if (dryRun) {
-  console.log('ℹ️  Dry run — skipping TTS generation. Narration JSON written above.');
+  const msg = skipExtract
+    ? 'ℹ️  Dry run — skipping TTS generation. No narration JSON was written (--skip-extract used).'
+    : 'ℹ️  Dry run — skipping TTS generation. Narration JSON written above.';
+  console.log(msg);
   process.exit(0);
 }
 
 // ── Step 2: Generate voiceover ────────────────────────────────────────────────
+
+if (!fs.existsSync(narrationPath)) {
+  console.error(`Narration file not found: ${narrationPath}`);
+  console.error('Run without --skip-extract to generate it, or ensure the file exists.');
+  process.exit(1);
+}
 
 const compositionName = path.basename(compositionPath, path.extname(compositionPath));
 const outputPath = path.join(outputDir, `${compositionName}-voiceover.mp3`);

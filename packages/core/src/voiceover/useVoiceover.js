@@ -7,15 +7,19 @@
  * Convention: audio files live in public/audio/<CompositionId>-voiceover.mp3
  * and sync manifests at public/audio/<CompositionId>-voiceover.sync.json
  *
+ * The hook probes the audio URL with a HEAD request before rendering <Audio>.
+ * If the file is missing it renders nothing — so the composition works both
+ * with and without TTS credentials being set.
+ *
  * Usage in a composition:
  *
- *   import { useVoiceover } from '@videodoc/core';
+ *   import { useVoiceover } from '@videodoc/core/voiceover';
  *
  *   export const OnboardingJourney = () => {
- *     const { VoiceoverAudio, isReady } = useVoiceover();
+ *     const { VoiceoverAudio } = useVoiceover();
  *     return (
  *       <AbsoluteFill>
- *         {isReady && <VoiceoverAudio />}
+ *         <VoiceoverAudio />
  *         ...
  *       </AbsoluteFill>
  *     );
@@ -25,15 +29,17 @@
  *   const { VoiceoverAudio } = useVoiceover({ file: 'my-custom-voiceover.mp3' });
  */
 
-import { useVideoConfig, staticFile, Audio } from 'remotion';
+import { useState, useEffect, useCallback } from 'react';
+import { useVideoConfig, staticFile, Audio, delayRender, continueRender } from 'remotion';
 
 /**
  * @param {object} options
- * @param {string} [options.file]         - Override audio filename (default: <CompositionId>-voiceover.mp3)
- * @param {string} [options.audioDir]     - Override audio directory (default: 'audio')
- * @param {number} [options.volume]       - Playback volume 0–1 (default: 1)
- * @param {number} [options.startFrom]    - Start playback from this frame offset (default: 0)
- * @param {boolean} [options.muted]       - Mute the audio (useful during composition development)
+ * @param {string}  [options.file]      - Override audio filename (default: <CompositionId>-voiceover.mp3)
+ * @param {string}  [options.audioDir]  - Override audio directory (default: 'audio')
+ * @param {number}  [options.volume]    - Playback volume 0–1 (default: 1)
+ * @param {number}  [options.startFrom] - Start playback from this frame offset (default: 0)
+ * @param {boolean} [options.muted]     - Mute the audio (useful during development)
+ * @returns {{ VoiceoverAudio: () => import('react').ReactNode, isReady: boolean, src: string, syncData: object | null }}
  */
 export function useVoiceover({
   file,
@@ -45,38 +51,46 @@ export function useVoiceover({
   const { id: compositionId } = useVideoConfig();
 
   const resolvedFile = file ?? `${compositionId}-voiceover.mp3`;
-  const audioPath    = `${audioDir}/${resolvedFile}`;
+  const audioPath = `${audioDir}/${resolvedFile}`;
+  const src = staticFile(audioPath);
 
-  let src;
-  let isReady = false;
+  // isReady: true  → audio file exists, render <Audio>
+  // isReady: false → still checking
+  // isReady: null  → file not found, skip audio
+  const [isReady, setIsReady] = useState(false);
+  const [syncData, setSyncData] = useState(null);
 
-  try {
-    src = staticFile(audioPath);
-    isReady = true;
-  } catch {
-    // File not found — silently skip audio in preview
-    isReady = false;
-  }
+  useEffect(() => {
+    // Use delayRender so Remotion waits for the probe before capturing frames.
+    const handle = delayRender(`Probing voiceover: ${src}`);
 
-  /**
-   * Drop-in <Audio> component pre-wired with the resolved src and options.
-   * Render this at the top level of your composition (not inside a Sequence).
-   */
-  const VoiceoverAudio = () => {
+    const probe = async () => {
+      try {
+        const res = await fetch(src, { method: 'HEAD' });
+        setIsReady(res.ok ? true : null);
+      } catch {
+        setIsReady(null);
+      } finally {
+        continueRender(handle);
+      }
+    };
+
+    probe();
+  }, [src]);
+
+  useEffect(() => {
+    if (!isReady) return;
+    const syncUrl = staticFile(audioPath.replace(/\.(mp3|wav)$/i, '.sync.json'));
+    fetch(syncUrl)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setSyncData)
+      .catch(() => setSyncData(null));
+  }, [isReady, audioPath]);
+
+  const VoiceoverAudio = useCallback(() => {
     if (!isReady || muted) return null;
-    return (
-      <Audio
-        src={src}
-        volume={volume}
-        startFrom={startFrom}
-      />
-    );
-  };
+    return <Audio src={src} volume={volume} startFrom={startFrom} />;
+  }, [isReady, muted, src, volume, startFrom]);
 
-  return {
-    VoiceoverAudio,
-    isReady,
-    src,
-    audioPath,
-  };
+  return { VoiceoverAudio, isReady, src, syncData };
 }

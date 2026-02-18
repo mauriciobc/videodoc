@@ -1,0 +1,26 @@
+{
+  "fps": 30,
+  "steps": [
+    {
+      "from": 90,
+      "durationInFrames": 90,
+      "durationSeconds": 3,
+      "startSeconds": 3,
+      "text": "Acesse o site e localize a opção de entrar."
+    },
+    {
+      "from": 180,
+      "durationInFrames": 90,
+      "durationSeconds": 3,
+      "startSeconds": 6,
+      "text": "Na tela de login, informe e-mail e senha."
+    },
+    {
+      "from": 270,
+      "durationInFrames": 90,
+      "durationSeconds": 3,
+      "startSeconds": 9,
+      "text": "Clique em Entrar para acessar sua conta."
+    }
+  ]
+}
