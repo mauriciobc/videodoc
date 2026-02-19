@@ -79,7 +79,7 @@ export function App() {
         .filter(([, job]) => job.status === 'running' || job.status === 'pending')
         .map(([id]) => id);
       if (currentIds.length > 0) {
-        Promise.all(currentIds.map((id) => refreshJob(id)));
+        Promise.allSettled(currentIds.map((id) => refreshJob(id)));
       }
     }, 2000);
 
@@ -185,21 +185,27 @@ export function App() {
       brandPayload.assets = { logo: brandForm.logoPath };
     }
 
-    const res = await fetch(`/api/products/${selectedProductId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brand: brandPayload }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      addToast(data.error ?? 'Falha ao salvar marca.', 'error');
-      setBrandStatus('idle');
-      return;
+    try {
+      const res = await fetch(`/api/products/${selectedProductId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand: brandPayload }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error ?? 'Falha ao salvar marca.', 'error');
+        return;
+      }
+      await loadInitial();
+      addToast('Marca salva com sucesso!');
+      setBrandStatus('saved');
+      setTimeout(() => setBrandStatus('idle'), 2000);
+    } catch (err) {
+      addToast(err?.message ?? 'Erro de rede ao salvar marca.', 'error');
+      throw err;
+    } finally {
+      setBrandStatus((prev) => (prev === 'saving' ? 'idle' : prev));
     }
-    await loadInitial();
-    addToast('Marca salva com sucesso!');
-    setBrandStatus('saved');
-    setTimeout(() => setBrandStatus('idle'), 2000);
   }
 
   async function saveComposition(flowId, composition) {

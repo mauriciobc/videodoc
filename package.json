@@ -15,7 +15,7 @@
     "docs:render": "npm run docs:prerender && node docs-automation/render.mjs",
     "docs:generate": "npm run docs:screenshots && npm run docs:render",
     "docs:server": "node docs-automation/server/index.mjs",
-    "docs:stop": "pkill -f 'node docs-automation/server' 2>/dev/null; pkill -f 'vite docs-automation/ui' 2>/dev/null; echo 'Parou servidores docs.'",
+    "docs:stop": "pkill -f 'node docs-automation/server' 2>/dev/null; pkill -f 'vite docs-automation/ui' 2>/dev/null; echo 'Stopped docs servers.'",
     "docs:ui": "npx vite docs-automation/ui --config docs-automation/ui/vite.config.js --host --port 5174"
   },
   "devDependencies": {

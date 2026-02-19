@@ -138,7 +138,6 @@ test('Journey: Drag and Drop', async ({ page }) => {
   });
 });
 ```
-```
 
 **Tips:**
 - Use `data-testid` attributes on key UI elements for stable selectors

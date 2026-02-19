@@ -17,7 +17,7 @@ export const Intro = ({ title, appName, description, logo, theme = defaultTheme 
       <div style={{ position: 'absolute', top: '10%', right: '5%', width: 300, height: 300, borderRadius: '50%', background: `radial-gradient(circle, ${theme.accent}20 0%, transparent 70%)`, pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '10%', left: '5%', width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${theme.accentAlt}15 0%, transparent 70%)`, pointerEvents: 'none' }} />
       {logo ? (
-        <Img src={staticFile(logo)} style={{ height: 64, maxWidth: 240, objectFit: 'contain', marginBottom: 20, opacity: appNameOpacity }} />
+        <Img src={staticFile(logo)} alt={appName ? `${appName} logo` : ''} style={{ height: 64, maxWidth: 240, objectFit: 'contain', marginBottom: 20, opacity: appNameOpacity }} />
       ) : appName && (
         <div style={{ fontFamily: theme.fontFamily, fontSize: theme.fontSizeSmall, fontWeight: theme.fontWeightBold, color: theme.accent, textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 20, opacity: appNameOpacity }}>
           {appName}
