@@ -42,6 +42,7 @@ export const AuthFlow = ({ appName = 'Mealtime', brand = {} }) => {
       <Sequence from={0} durationInFrames={STEP}>
         <Intro
           appName={appName}
+          logo={brand?.assets?.logo}
           title="Como fazer login"
           description="Tutorial rápido do fluxo de autenticação."
           theme={flowTheme}

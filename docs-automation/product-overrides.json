@@ -2,11 +2,13 @@
   "mealtime": {
     "brand": {
       "colors": {
-        "accent": "#ff5733",
+        "accent": "#2698df",
         "accentAlt": "#8b5cf6",
         "background": "#0f0f0f"
       },
-      "assets": {}
+      "assets": {
+        "logo": "brand/mealtime-logo.svg"
+      }
     }
   }
 }

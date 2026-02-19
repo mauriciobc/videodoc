@@ -6,6 +6,30 @@ const EMPTY_STEPS = {
   render: 'pending',
 };
 
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
+  return { toasts, addToast };
+}
+
+function ToastContainer({ toasts }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="toast-container" role="status" aria-live="polite">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast toast-${toast.type}`}>
+          {toast.type === 'success' ? '✓ ' : '✕ '}
+          {toast.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function App() {
   const [products, setProducts] = useState([]);
   const [flows, setFlows] = useState([]);
@@ -14,13 +38,15 @@ export function App() {
   const [jobs, setJobs] = useState({});
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
-  const [error, setError] = useState('');
+  const { toasts, addToast } = useToasts();
+  const [brandStatus, setBrandStatus] = useState('idle');
+  const [logoUploadStatus, setLogoUploadStatus] = useState('idle');
 
   const [brandForm, setBrandForm] = useState({
     accent: '#6366f1',
     accentAlt: '#8b5cf6',
     background: '#0f0f0f',
-    logoFile: null,
+    logoPath: null,
   });
 
   useEffect(() => {
@@ -31,6 +57,16 @@ export function App() {
     if (!selectedProductId) return;
     loadProduct(selectedProductId);
   }, [selectedProductId]);
+
+  const refreshJob = useCallback(async (jobId) => {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setJobs((current) => ({ ...current, [jobId]: data }));
+    if (data.status === 'done') {
+      await refreshOutput(data.flowId);
+    }
+  }, []);
 
   useEffect(() => {
     const ids = Object.entries(jobs)
@@ -72,7 +108,7 @@ export function App() {
         await refreshOutput(flow.id);
       }
     } catch (err) {
-      setError(err.message);
+      addToast(err.message, 'error');
     }
   }
 
@@ -81,14 +117,15 @@ export function App() {
       const res = await fetch(`/api/products/${productId}`);
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Falha ao carregar produto.');
+        addToast(data.error ?? 'Falha ao carregar produto.', 'error');
         setBrandForm((prev) => ({
           ...prev,
           accent: '#6366f1',
           accentAlt: '#8b5cf6',
           background: '#0f0f0f',
-          logoFile: null,
+          logoPath: null,
         }));
+        setLogoUploadStatus('idle');
         return;
       }
       const colors = data.brand?.colors ?? {};
@@ -97,47 +134,72 @@ export function App() {
         accent: colors.accent ?? '#6366f1',
         accentAlt: colors.accentAlt ?? '#8b5cf6',
         background: colors.background ?? '#0f0f0f',
-        logoFile: null,
+        logoPath: data.brand?.assets?.logo ?? null,
       }));
+      setLogoUploadStatus('idle');
     } catch (err) {
-      setError(err.message ?? 'Falha ao carregar produto.');
+      addToast(err.message ?? 'Falha ao carregar produto.', 'error');
       setBrandForm((prev) => ({
         ...prev,
         accent: '#6366f1',
         accentAlt: '#8b5cf6',
         background: '#0f0f0f',
-        logoFile: null,
+        logoPath: null,
       }));
+      setLogoUploadStatus('idle');
+    }
+  }
+
+  async function handleLogoSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLogoUploadStatus('uploading');
+    try {
+      const form = new FormData();
+      form.set('logo', file);
+      const res = await fetch(`/api/products/${selectedProductId}/logo`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Falha ao enviar logo.');
+      setBrandForm((prev) => ({ ...prev, logoPath: data.logoPath }));
+      setLogoUploadStatus('done');
+    } catch (err) {
+      addToast(err.message, 'error');
+      setLogoUploadStatus('error');
     }
   }
 
   async function saveBrand(event) {
     event.preventDefault();
-    const form = new FormData();
-    form.set(
-      'brand',
-      JSON.stringify({
-        colors: {
-          accent: brandForm.accent,
-          accentAlt: brandForm.accentAlt,
-          background: brandForm.background,
-        },
-      })
-    );
-    if (brandForm.logoFile) {
-      form.set('logo', brandForm.logoFile);
+    setBrandStatus('saving');
+    const brandPayload = {
+      colors: {
+        accent: brandForm.accent,
+        accentAlt: brandForm.accentAlt,
+        background: brandForm.background,
+      },
+    };
+    if (brandForm.logoPath) {
+      brandPayload.assets = { logo: brandForm.logoPath };
     }
 
     const res = await fetch(`/api/products/${selectedProductId}`, {
       method: 'PATCH',
-      body: form,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: brandPayload }),
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? 'Falha ao salvar marca.');
+      addToast(data.error ?? 'Falha ao salvar marca.', 'error');
+      setBrandStatus('idle');
       return;
     }
     await loadInitial();
+    addToast('Marca salva com sucesso!');
+    setBrandStatus('saved');
+    setTimeout(() => setBrandStatus('idle'), 2000);
   }
 
   async function saveComposition(flowId, composition) {
@@ -148,18 +210,20 @@ export function App() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? 'Falha ao salvar configuração.');
-      return;
+      addToast(data.error ?? 'Falha ao salvar configuração.', 'error');
+      return false;
     }
     setFlows((current) => current.map((flow) => (flow.id === flowId ? data : flow)));
+    addToast('Configuração salva!');
+    return true;
   }
 
   async function generate(flowId) {
     const res = await fetch(`/api/flows/${flowId}/generate`, { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? 'Falha ao iniciar geração.');
-      return;
+      addToast(data.error ?? 'Falha ao iniciar geração.', 'error');
+      return false;
     }
 
     setJobs((current) => ({
@@ -170,17 +234,9 @@ export function App() {
         log: [],
       },
     }));
+    addToast('Geração de vídeo iniciada!');
+    return true;
   }
-
-  const refreshJob = useCallback(async (jobId) => {
-    const res = await fetch(`/api/jobs/${jobId}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setJobs((current) => ({ ...current, [jobId]: data }));
-    if (data.status === 'done') {
-      await refreshOutput(data.flowId);
-    }
-  }, []);
 
   async function refreshOutput(flowId) {
     const res = await fetch(`/api/flows/${flowId}/output`);
@@ -190,13 +246,13 @@ export function App() {
   }
 
   return (
+    <>
+    <ToastContainer toasts={toasts} />
     <div className="page">
       <header>
         <h1>Videodoc Manager</h1>
         <p>Gerencie produtos, fluxos e geração de vídeos sem editar código.</p>
       </header>
-
-      {error ? <div className="error">{error}</div> : null}
 
       <section className="card">
         <label>
@@ -247,22 +303,34 @@ export function App() {
           </label>
           <label>
             Logo (opcional)
+            {brandForm.logoPath && logoUploadStatus !== 'uploading' && (
+              <span className="muted" style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                {logoUploadStatus === 'done' ? '✓ ' : ''}{brandForm.logoPath.split('/').pop()}
+              </span>
+            )}
+            {logoUploadStatus === 'uploading' && (
+              <span className="muted" style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                Enviando...
+              </span>
+            )}
             <input
               type="file"
               accept=".png,.jpg,.jpeg,.webp,.svg"
-              onChange={(event) =>
-                setBrandForm((prev) => ({
-                  ...prev,
-                  logoFile: event.target.files?.[0] ?? null,
-                }))
-              }
+              disabled={logoUploadStatus === 'uploading'}
+              onChange={handleLogoSelect}
             />
           </label>
-          <button type="submit">Salvar marca</button>
+          <button
+            type="submit"
+            disabled={brandStatus === 'saving'}
+            className={brandStatus === 'saved' ? 'btn-saved' : ''}
+          >
+            {brandStatus === 'saving' ? 'Salvando...' : brandStatus === 'saved' ? 'Salvo ✓' : 'Salvar marca'}
+          </button>
         </form>
       </section>
 
-      <VoiceoverSettings />
+      <VoiceoverSettings addToast={addToast} />
 
       <section className="flows">
         {filteredFlows.map((flow) => (
@@ -277,11 +345,15 @@ export function App() {
         ))}
       </section>
     </div>
+    </>
   );
 }
 
 function FlowCard({ flow, output, jobs, onSave, onGenerate }) {
   const [local, setLocal] = useState(() => normalizeComposition(flow.composition));
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [generating, setGenerating] = useState(false);
+
   useEffect(() => {
     setLocal(normalizeComposition(flow.composition));
   }, [flow]);
@@ -290,6 +362,23 @@ function FlowCard({ flow, output, jobs, onSave, onGenerate }) {
     () => Object.values(jobs).find((job) => job.flowId === flow.id && job.status !== 'done'),
     [jobs, flow.id]
   );
+
+  async function handleSave() {
+    setSaveStatus('saving');
+    const ok = await onSave(flow.id, local);
+    if (ok) {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } else {
+      setSaveStatus('idle');
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    await onGenerate(flow.id);
+    setGenerating(false);
+  }
 
   const generatedAt = output?.generatedAt ? new Date(output.generatedAt).toLocaleString('pt-BR') : '-';
 
@@ -353,15 +442,21 @@ function FlowCard({ flow, output, jobs, onSave, onGenerate }) {
       </div>
 
       <div className="actions">
-        <button onClick={() => onSave(flow.id, local)}>Salvar configuração</button>
         <button
-            type="button"
-            disabled={!!activeJob}
-            aria-disabled={!!activeJob}
-            onClick={() => onGenerate(flow.id)}
-          >
-            Gerar vídeo
-          </button>
+          onClick={handleSave}
+          disabled={saveStatus === 'saving'}
+          className={saveStatus === 'saved' ? 'btn-saved' : ''}
+        >
+          {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'saved' ? 'Salvo ✓' : 'Salvar configuração'}
+        </button>
+        <button
+          type="button"
+          disabled={!!activeJob || generating}
+          aria-disabled={!!activeJob || generating}
+          onClick={handleGenerate}
+        >
+          {generating ? 'Iniciando...' : 'Gerar vídeo'}
+        </button>
       </div>
 
       <p className="muted">Última geração: {generatedAt}</p>
@@ -400,35 +495,49 @@ function normalizeComposition(composition) {
   };
 }
 
-function VoiceoverSettings() {
+function VoiceoverSettings({ addToast }) {
   const [settings, setSettings] = useState(null);
   const [voices, setVoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isCustom, setIsCustom] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle');
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
-      fetch('/api/voiceover/settings').then((r) => r.json()),
-      fetch('/api/voiceover/voices').then((r) => r.json()),
+      fetch('/api/voiceover/settings').then((r) => {
+        if (!r.ok) throw new Error(`Settings: ${r.status}`);
+        return r.json();
+      }),
+      fetch('/api/voiceover/voices').then((r) => {
+        if (!r.ok) throw new Error(`Voices: ${r.status}`);
+        return r.json();
+      }),
     ])
       .then(([s, v]) => {
-        setSettings(s);
-        setVoices(v);
-        // Check if current voice is in the list
-        const known = v.find((x) => x.name === s.name);
+        if (cancelled) return;
+        setSettings(s ?? {});
+        setVoices(Array.isArray(v) ? v : []);
+        const known = Array.isArray(v) && v.find((x) => x?.name === s?.name);
         setIsCustom(!known);
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
-        setLoading(false);
+        if (!cancelled) {
+          setError(err.message);
+          setSettings({});
+          setVoices([]);
+          setLoading(false);
+        }
       });
+    return () => { cancelled = true; };
   }, []);
 
   async function save(e) {
     e.preventDefault();
     setError(null);
+    setSaveStatus('saving');
     try {
       const res = await fetch('/api/voiceover/settings', {
         method: 'PATCH',
@@ -440,17 +549,33 @@ function VoiceoverSettings() {
       setSettings(data);
       const known = voices.find((x) => x.name === data.name);
       setIsCustom(!known);
+      addToast('Narração salva com sucesso!');
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
-      setError(err.message);
+      addToast(err.message, 'error');
+      setSaveStatus('idle');
     }
   }
 
-  if (loading) return <p>Carregando voz...</p>;
+  if (loading) return <p className="muted">Carregando voz...</p>;
+
+  if (error && !settings?.name) {
+    return (
+      <section className="card">
+        <h2>Narração (Voice-over)</h2>
+        <div className="error">{error}</div>
+        <p className="muted">Verifique se o servidor da API está rodando em localhost:3333.</p>
+        <button type="button" onClick={() => { setError(null); setLoading(true); window.location.reload(); }}>
+          Recarregar
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="card">
       <h2>Narração (Voice-over)</h2>
-      {error && <div className="error">{error}</div>}
       <form onSubmit={save} className="grid">
         <label>
           Voz
@@ -535,7 +660,13 @@ function VoiceoverSettings() {
           <small className="muted">Recomendado: -6 a +6 dB</small>
         </label>
 
-        <button type="submit">Salvar Narração</button>
+        <button
+          type="submit"
+          disabled={saveStatus === 'saving'}
+          className={saveStatus === 'saved' ? 'btn-saved' : ''}
+        >
+          {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'saved' ? 'Salvo ✓' : 'Salvar Narração'}
+        </button>
       </form>
     </section>
   );

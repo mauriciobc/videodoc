@@ -108,6 +108,22 @@ app.get('/api/products/:productId', (req, res) => {
   }
 });
 
+app.post('/api/products/:productId/logo', upload.single('logo'), (req, res) => {
+  try {
+    const manifest = loadManifestWithOverrides();
+    const product = resolveProductById(manifest, req.params.productId);
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+    const ext = getSafeExt(req.file.originalname);
+    const filename = `${product.id}-logo${ext}`;
+    fs.writeFileSync(path.join(brandDir, filename), req.file.buffer);
+    res.json({ logoPath: `brand/${filename}` });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.patch('/api/products/:productId', upload.single('logo'), (req, res) => {
   try {
     const manifest = loadManifestWithOverrides();

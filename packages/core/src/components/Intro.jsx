@@ -1,7 +1,7 @@
-import { useCurrentFrame, interpolate, AbsoluteFill } from 'remotion';
+import { useCurrentFrame, interpolate, AbsoluteFill, staticFile, Img } from 'remotion';
 import { defaultTheme } from '../remotion/theme.js';
 
-export const Intro = ({ title, appName, description, theme = defaultTheme }) => {
+export const Intro = ({ title, appName, description, logo, theme = defaultTheme }) => {
   const frame = useCurrentFrame();
   const appNameOpacity = interpolate(frame, [5, 25], [0, 1], { extrapolateRight: 'clamp' });
   const titleOpacity = interpolate(frame, [15, 40], [0, 1], { extrapolateRight: 'clamp' });
@@ -16,7 +16,9 @@ export const Intro = ({ title, appName, description, theme = defaultTheme }) => 
     }}>
       <div style={{ position: 'absolute', top: '10%', right: '5%', width: 300, height: 300, borderRadius: '50%', background: `radial-gradient(circle, ${theme.accent}20 0%, transparent 70%)`, pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '10%', left: '5%', width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${theme.accentAlt}15 0%, transparent 70%)`, pointerEvents: 'none' }} />
-      {appName && (
+      {logo ? (
+        <Img src={staticFile(logo)} style={{ height: 64, maxWidth: 240, objectFit: 'contain', marginBottom: 20, opacity: appNameOpacity }} />
+      ) : appName && (
         <div style={{ fontFamily: theme.fontFamily, fontSize: theme.fontSizeSmall, fontWeight: theme.fontWeightBold, color: theme.accent, textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 20, opacity: appNameOpacity }}>
           {appName}
         </div>
